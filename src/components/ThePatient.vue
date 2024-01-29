@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useYJSStore } from "@/store/yjs";
@@ -16,7 +16,10 @@ const {
   userList,
   counter,
   textareaValue,
+  todolist,
 } = storeToRefs(yjsStore);
+
+const todoText = ref("");
 
 const route = useRoute();
 const chart = ref(null);
@@ -53,12 +56,12 @@ const setupAwareness = () => {
   setMyInfo();
   syncUserList();
 
-  console.warn(`我是 ${awareness.value.clientID}`);
+  // console.warn(`我是 ${awareness.value.clientID}`);
   awareness.value.on("change", ({ added, updated, removed }) => {
-    console.warn("added", added);
-    console.warn("updated", updated);
-    console.warn("removed", removed);
-    console.warn("---------------------");
+    // console.warn("added", added);
+    // console.warn("updated", updated);
+    // console.warn("removed", removed);
+    // console.warn("---------------------");
     syncUserList();
   });
 };
@@ -71,10 +74,10 @@ const setMyInfo = () => {
 const syncUserList = () => {
   if (!awareness.value) return;
 
-  console.warn(
-    "當前房間有誰？ syncUserList：awareness.value.getStates()",
-    awareness.value.getStates()
-  );
+  // console.warn(
+  //   "當前房間有誰？ syncUserList：awareness.value.getStates()",
+  //   awareness.value.getStates()
+  // );
 
   userList.value = [...awareness.value.getStates()].map(
     ([clientID, state]) => clientID
@@ -84,17 +87,17 @@ const syncUserList = () => {
 const setupYDoc = () => {
   // 1. Share 數字
   // 2. Share 字串
-  // 3. Share Array
-  // 4. Share Object
+  // 3. Share Object - Array
 
   const ymap = ydoc.value.getMap("shared");
-
   ymap.set("counter", 0);
   ymap.set("content", "");
+  ymap.set("todolist", []);
 
   ymap.observe((event) => {
     if (event.keysChanged.has("counter")) counter.value = ymap.get("counter")
     if (event.keysChanged.has("content")) textareaValue.value = ymap.get("content")
+    if (event.keysChanged.has("todolist")) todolist.value = ymap.get("todolist")
   });
 };
 
@@ -118,6 +121,27 @@ const minusOne = () => {
 
 const updateText = (e) => {
   ydoc.value.getMap("shared").set("content", e.target.value);
+};
+
+const addTodo = () => {
+  if (!todoText.value.trim()) {
+    todoText.value = "";
+    return;
+  }
+
+  const todo = {
+    id: `${Date.now()}${myClientId.value}`,
+    description: todoText.value,
+    isDone: false,
+  };
+  ydoc.value.getMap("shared").set("todolist", [...todolist.value, todo]);
+  todoText.value = "";
+};
+
+const deleteTodo = (id) => {
+  const index = todolist.value.findIndex((item) => item.id === id);
+  todolist.value.splice(index, 1);
+  ydoc.value.getMap("shared").set("todolist", todolist.value);
 };
 </script>
 
@@ -173,6 +197,23 @@ const updateText = (e) => {
         <b>content</b>
         <textarea :value="textareaValue" @input="updateText" style="resize: none;"></textarea>
       </div>
+      <div class="editor-area-item">
+        <b>todolist</b>
+        <div style="display: flex; flex-direction: column; align-items: flex-start;">
+          <ul v-if="todolist.length">
+            <li v-for="item in todolist" :key="item.id">
+              <div class="done-or-not" :class="item.isDone ? 'done' : 'not-done'" ></div>
+              {{ item.description }}
+              <button @click="deleteTodo(item.id)">x</button>
+            </li>
+          </ul>
+          <span v-else>暫無 Todo</span>
+          <div class="edit-panel">
+            <input type="text" v-model="todoText">
+            <button @click="addTodo">+ Todo</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -213,7 +254,23 @@ hr {
   gap: 10px;
 }
 
+span, b {
+  line-height: 40px;
+}
+
+.done-or-not {
+  width: 10px;
+  height: 10px;
+}
+
 .editor-area-item {
+  display: flex;
+  align-items: flex-start;
+  min-height: 40px;
+  gap: 10px;
+}
+
+.edit-panel {
   display: flex;
   align-items: center;
   gap: 10px;

@@ -12,5 +12,6 @@ export const useYJSStore = defineStore('yjs', {
 
     counter: 0,
     textareaValue: '',
+    todolist: [],
   }),
 })
